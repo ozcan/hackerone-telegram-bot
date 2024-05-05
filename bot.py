@@ -8,9 +8,10 @@ import traceback
 from flask import Flask, Response
 from dotenv import load_dotenv
 
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
 load_dotenv(dotenv_path)
 app = Flask(__name__)
+
 
 @app.route("/")
 def index():
@@ -61,7 +62,11 @@ async def send_messages():
             + item["attributes"]["url"]
         )
 
-        await bot.send_message(text=message, chat_id=os.environ["TELEGRAM_CHAT_ID"])
+        await bot.send_message(
+            text=message,
+            chat_id=os.environ["TELEGRAM_CHAT_ID"],
+            disable_notification=True,
+        )
 
     pickle.dump(sent_message_urls, open(pickle_file, "wb"))
 
