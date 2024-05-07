@@ -1,4 +1,5 @@
 import os
+import atoma
 import pickle
 import hashlib
 import requests
@@ -34,41 +35,63 @@ async def send_messages():
         sent_message_urls = set()
         pickle.dump(sent_message_urls, open(pickle_file, "wb"))
 
+    messages = []
+
+    # HackerOne Hacktivity feed.
     r = requests.get(
         "https://api.hackerone.com/v1/hackers/hacktivity",
         auth=(os.environ["HACKERONE_API_USERNAME"], os.environ["HACKERONE_API_KEY"]),
         headers={"Accept": "application/json"},
     )
-    bot = telegram.Bot(os.environ["TELEGRAM_BOT_TOKEN"])
-
     for item in r.json()["data"]:
         if item["attributes"]["url"] == None:
             continue
 
-        url_hash = hashlib.sha256(item["attributes"]["url"].encode("utf-8")).hexdigest()
+        messages.append(
+            {
+                "text": item["attributes"]["title"]
+                + "\n"
+                + item["relationships"]["program"]["data"]["attributes"]["name"]
+                + " disclosed a bug submitted by "
+                + item["relationships"]["reporter"]["data"]["attributes"]["username"]
+                + ": "
+                + item["attributes"]["url"],
+                "url": item["attributes"]["url"],
+            }
+        )
+
+    # Reddit RSS Feed for Netsec subreddit
+    try:
+        feed_text = requests.get("https://www.reddit.com/r/netsec/top/.rss")
+        feed = atoma.parse_atom_bytes(feed_text.content)
+        for entry in feed.entries:
+            messages.append(
+                {
+                    "text": entry.title.value + " - " + entry.links[0].href,
+                    "url": entry.links[0].href,
+                }
+            )
+    except atoma.exceptions.FeedXMLError as ex:
+        # Probably rate limited by Reddit, so we just ignore it blissfully.
+        pass
+
+    # send messages and save sent url to pickle file
+    bot = telegram.Bot(os.environ["TELEGRAM_BOT_TOKEN"])
+    for message in messages:
+        text, url = message["text"], message["url"]
+        url_hash = hashlib.sha256(url.encode("utf-8")).hexdigest()
 
         if url_hash in sent_message_urls:
             continue
 
-        sent_message_urls.add(url_hash)
-
-        message = (
-            item["attributes"]["title"]
-            + "\n"
-            + item["relationships"]["program"]["data"]["attributes"]["name"]
-            + " disclosed a bug submitted by "
-            + item["relationships"]["reporter"]["data"]["attributes"]["username"]
-            + ": "
-            + item["attributes"]["url"]
-        )
-
         await bot.send_message(
-            text=message,
+            text=text,
             chat_id=os.environ["TELEGRAM_CHAT_ID"],
             disable_notification=True,
         )
 
-    pickle.dump(sent_message_urls, open(pickle_file, "wb"))
+        sent_message_urls.add(url_hash)
+        pickle.dump(sent_message_urls, open(pickle_file, "wb"))
 
 
 if __name__ == "__main__":
