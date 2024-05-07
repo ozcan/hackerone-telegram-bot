@@ -84,14 +84,22 @@ async def send_messages():
         if url_hash in sent_message_urls:
             continue
 
-        await bot.send_message(
+        TIMEOUT = 30
+        response = await bot.send_message(
             text=text,
             chat_id=os.environ["TELEGRAM_CHAT_ID"],
             disable_notification=True,
+            # set timeout
+            read_timeout=TIMEOUT,
+            write_timeout=TIMEOUT,
+            connect_timeout=TIMEOUT,
+            pool_timeout=TIMEOUT,
         )
 
-        sent_message_urls.add(url_hash)
-        pickle.dump(sent_message_urls, open(pickle_file, "wb"))
+        if isinstance(response, telegram.Message):
+            # successfully sent message
+            sent_message_urls.add(url_hash)
+            pickle.dump(sent_message_urls, open(pickle_file, "wb"))
 
 
 if __name__ == "__main__":
