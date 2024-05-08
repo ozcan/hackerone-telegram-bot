@@ -33,7 +33,7 @@ async def send_messages():
     try:
         message_history = pickle.load(open(message_history_file, "rb"))
     except (OSError, IOError) as e:
-        message_history = set()
+        message_history = {}
         pickle.dump(message_history, open(message_history_file, "wb"))
 
     messages = []
