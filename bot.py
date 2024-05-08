@@ -1,4 +1,5 @@
 import os
+import time
 import atoma
 import pickle
 import hashlib
@@ -28,12 +29,12 @@ def index():
 
 
 async def send_messages():
-    pickle_file = "sent_message_urls.pickle"
+    message_history_file = "message_history.pickle"
     try:
-        sent_message_urls = pickle.load(open(pickle_file, "rb"))
+        message_history = pickle.load(open(message_history_file, "rb"))
     except (OSError, IOError) as e:
-        sent_message_urls = set()
-        pickle.dump(sent_message_urls, open(pickle_file, "wb"))
+        message_history = set()
+        pickle.dump(message_history, open(message_history_file, "wb"))
 
     messages = []
 
@@ -81,7 +82,7 @@ async def send_messages():
         text, url = message["text"], message["url"]
         url_hash = hashlib.sha256(url.encode("utf-8")).hexdigest()
 
-        if url_hash in sent_message_urls:
+        if url_hash in message_history:
             continue
 
         TIMEOUT = 30
@@ -97,9 +98,13 @@ async def send_messages():
         )
 
         if isinstance(response, telegram.Message):
-            # successfully sent message
-            sent_message_urls.add(url_hash)
-            pickle.dump(sent_message_urls, open(pickle_file, "wb"))
+            # successfully sent message, add to history
+            message_history[url_hash] = {
+                "text": text[:64], # full next not needed
+                "url": url,
+                "timestamp": time.time(),
+            }
+            pickle.dump(message_history, open(message_history_file, "wb"))
 
 
 if __name__ == "__main__":
